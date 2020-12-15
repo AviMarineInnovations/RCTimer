@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">BT Race Timer</string>
+    <string name="devices">Bluetooth Devices</string>
+</resources>
