@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.text.Editable;
 import android.text.Spannable;
@@ -42,6 +43,8 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
     private boolean hexEnabled = false;
     private boolean pendingNewline = false;
     private String newline = TextUtil.newline_crlf;
+    private static String start = "A0 01 01 A2";
+    private static String stop = "A0 01 00 A1";
 
     /*
      * Lifecycle
@@ -126,15 +129,28 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
 //        hexWatcher = new TextUtil.HexWatcher(sendText);
 //        hexWatcher.enable(hexEnabled);
 
-        String start = "A0 01 01 A2";
-        String stop = "A0 01 00 A1";
+
 
         View Start = view.findViewById(R.id.button);
         View Stop = view.findViewById(R.id.button2);
-        View StartD = view.findViewById(R.id.button3);
+        View startShort = view.findViewById(R.id.button3);
+        View startLong = view.findViewById(R.id.button4);
         Start.setOnClickListener(v -> send(start));
         Stop.setOnClickListener(v -> send(stop));
+        startShort.setOnClickListener(v -> startSoundDuration(500));
+        startShort.setOnClickListener(v -> startSoundDuration(1500));
         return view;
+    }
+
+    private void startSoundDuration(int i) {
+        send(start);
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable(){
+            @Override
+            public void run(){
+                send(stop);
+            }
+        }, i);
     }
 
     @Override
