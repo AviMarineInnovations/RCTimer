@@ -7,8 +7,8 @@
         android:title="Clear"
         app:showAsAction="always" />
     <item
-        android:id="@+id/newline"
-        android:title="Newline"
+        android:id="@+id/devices"
+        android:title="Devices"
         app:showAsAction="never" />
     <item
         android:id="@+id/hex"

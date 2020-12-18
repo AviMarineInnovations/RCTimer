@@ -1,50 +1,71 @@
 package in.avimarine.rctimer;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
-import android.text.method.ScrollingMovementMethod;
 import android.text.style.ForegroundColorSpan;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-public class TimerFragment extends Fragment implements ServiceConnection, SerialListener {
+import java.util.Objects;
+
+public class TimerFragment extends Fragment implements ServiceConnection, SerialListener, BluetoothListener {
+
+    private static final String TAG = "TimerFragment";
+
+    @Override
+    public void onBTConnected(String mac) {
+        if (deviceAddress.equals(mac)) {
+            if (status!=null) {
+                status.setImageResource(android.R.drawable.presence_online);
+            }
+        }
+    }
+
+    @Override
+    public void onBTDisconnected(String mac) {
+        if (deviceAddress.equals(mac)) {
+            if (status!=null) {
+                status.setImageResource(android.R.drawable.presence_offline);
+            }
+        }
+    }
 
     private enum Connected { False, Pending, True }
 
     private String deviceAddress;
     private SerialService service;
-
-    private TextUtil.HexWatcher hexWatcher;
+    private ImageView status;
 
     private Connected connected = Connected.False;
     private boolean initialStart = true;
     private boolean hexEnabled = false;
-    private boolean pendingNewline = false;
     private String newline = TextUtil.newline_crlf;
-    private static String start = "A0 01 01 A2";
-    private static String stop = "A0 01 00 A1";
+    private static final String start = "A0 01 01 A2";
+    private static final String stop = "A0 01 00 A1";
+
+    private BluetoothConnectionReceiver btcr;
 
     /*
      * Lifecycle
@@ -55,6 +76,13 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
         setHasOptionsMenu(true);
         setRetainInstance(true);
         deviceAddress = getArguments().getString("device");
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        btcr = new BluetoothConnectionReceiver(this);
+        getActivity().registerReceiver(btcr, filter);
+
     }
 
     @Override
@@ -62,6 +90,7 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
         if (connected != Connected.False)
             disconnect();
         getActivity().stopService(new Intent(getActivity(), SerialService.class));
+        getActivity().unregisterReceiver(btcr);
         super.onDestroy();
     }
 
@@ -70,8 +99,11 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
         super.onStart();
         if(service != null)
             service.attach(this);
-        else
-            getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+//        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//            getActivity().startForegroundService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+//        } else{
+            getActivity().startService(new Intent(getActivity(), SerialService.class));
+//        }
     }
 
     @Override
@@ -111,11 +143,16 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
             initialStart = false;
             getActivity().runOnUiThread(this::connect);
         }
+
+
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
+
         service = null;
+
+
     }
 
     /*
@@ -124,33 +161,29 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_timer, container, false);
-
-
-//        hexWatcher = new TextUtil.HexWatcher(sendText);
-//        hexWatcher.enable(hexEnabled);
-
-
-
         View Start = view.findViewById(R.id.button);
         View Stop = view.findViewById(R.id.button2);
         View startShort = view.findViewById(R.id.button3);
         View startLong = view.findViewById(R.id.button4);
+        status = view.findViewById(R.id.imageView);
+        if (connected == Connected.True){
+            status.setImageResource(android.R.drawable.presence_online);
+        } else {
+            status.setImageResource(android.R.drawable.presence_offline);
+        }
+        status.setOnClickListener(v -> connect());
         Start.setOnClickListener(v -> send(start));
         Stop.setOnClickListener(v -> send(stop));
+
         startShort.setOnClickListener(v -> startSoundDuration(500));
-        startShort.setOnClickListener(v -> startSoundDuration(1500));
+        startLong.setOnClickListener(v -> startSoundDuration(1500));
         return view;
     }
 
     private void startSoundDuration(int i) {
         send(start);
         Handler handler = new Handler();
-        handler.postDelayed(new Runnable(){
-            @Override
-            public void run(){
-                send(stop);
-            }
-        }, i);
+        handler.postDelayed(() -> send(stop), i);
     }
 
     @Override
@@ -164,21 +197,12 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
         int id = item.getItemId();
         if (id == R.id.clear) {
             return true;
-        } else if (id == R.id.newline) {
-            String[] newlineNames = getResources().getStringArray(R.array.newline_names);
-            String[] newlineValues = getResources().getStringArray(R.array.newline_values);
-            int pos = java.util.Arrays.asList(newlineValues).indexOf(newline);
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle("Newline");
-            builder.setSingleChoiceItems(newlineNames, pos, (dialog, item1) -> {
-                newline = newlineValues[item1];
-                dialog.dismiss();
-            });
-            builder.create().show();
+        } else if (id == R.id.devices) {
+            Fragment fragment = new DevicesFragment();
+            getFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "devices").addToBackStack(null).commit();
             return true;
         } else if (id == R.id.hex) {
             hexEnabled = !hexEnabled;
-            hexWatcher.enable(hexEnabled);
             item.setChecked(hexEnabled);
             return true;
         } else {
@@ -195,7 +219,7 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
             BluetoothDevice device = bluetoothAdapter.getRemoteDevice(deviceAddress);
             status("connecting...");
             connected = Connected.Pending;
-            SerialSocket socket = new SerialSocket(getActivity().getApplicationContext(), device);
+            SerialSocket socket = new SerialSocket(Objects.requireNonNull(getActivity()).getApplicationContext(), device);
             service.connect(socket);
         } catch (Exception e) {
             onSerialConnectError(e);
@@ -203,8 +227,12 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
     }
 
     private void disconnect() {
+        Log.d(TAG, "Disconnected");
         connected = Connected.False;
         service.disconnect();
+        if (status!=null){
+            status.setImageResource(android.R.drawable.presence_offline);
+        }
     }
 
     private void send(String str) {
@@ -226,22 +254,6 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
         }
     }
 
-    private void receive(byte[] data) {
-        if(hexEnabled) {
-        } else {
-            String msg = new String(data);
-            if(newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
-                // don't show CR as ^M if directly before LF
-                msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
-                // special handling if CR and LF come in separate fragments
-                if (pendingNewline && msg.charAt(0) == '\n') {
-
-                }
-                pendingNewline = msg.charAt(msg.length() - 1) == '\r';
-            }
-        }
-    }
-
     private void status(String str) {
         SpannableStringBuilder spn = new SpannableStringBuilder(str+'\n');
         spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorStatusText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -254,6 +266,9 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
     public void onSerialConnect() {
         status("connected");
         connected = Connected.True;
+        if (status!=null){
+            status.setImageResource(android.R.drawable.presence_online);
+        }
     }
 
     @Override
@@ -264,7 +279,7 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
 
     @Override
     public void onSerialRead(byte[] data) {
-        receive(data);
+//        receive(data);
     }
 
     @Override

@@ -94,26 +94,26 @@ class SerialSocket implements Runnable {
             return;
         }
         connected = true;
-        try {
-            byte[] buffer = new byte[1024];
-            int len;
-            //noinspection InfiniteLoopStatement
-            while (true) {
-                len = socket.getInputStream().read(buffer);
-                byte[] data = Arrays.copyOf(buffer, len);
-                if(listener != null)
-                    listener.onSerialRead(data);
-            }
-        } catch (Exception e) {
-            connected = false;
-            if (listener != null)
-                listener.onSerialIoError(e);
-            try {
-                socket.close();
-            } catch (Exception ignored) {
-            }
-            socket = null;
-        }
+//        try {
+//            byte[] buffer = new byte[1024];
+//            int len;
+//            //noinspection InfiniteLoopStatement
+//            while (true) {
+//                len = socket.getInputStream().read(buffer);
+//                byte[] data = Arrays.copyOf(buffer, len);
+//                if(listener != null)
+//                    listener.onSerialRead(data);
+//            }
+//        } catch (Exception e) {
+//            connected = false;
+//            if (listener != null)
+//                listener.onSerialIoError(e);
+//            try {
+//                socket.close();
+//            } catch (Exception ignored) {
+//            }
+//            socket = null;
+//        }
     }
 
 }
