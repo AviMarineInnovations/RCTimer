@@ -17,14 +17,14 @@
     <Button
         android:id="@+id/button2"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="99dp"
         android:text="Stop"
         android:textSize="30sp" />
 
     <Button
         android:id="@+id/button3"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="183dp"
         android:text="Short Blast"
         android:textSize="30sp" />
 
@@ -37,8 +37,8 @@
 
     <ImageView
         android:id="@+id/imageView"
-        android:layout_width="match_parent"
-        android:layout_height="164dp"
+        android:layout_width="165dp"
+        android:layout_height="87dp"
         app:srcCompat="@android:drawable/presence_online" />
 
 
