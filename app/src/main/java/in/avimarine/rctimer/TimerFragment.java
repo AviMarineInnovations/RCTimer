@@ -61,7 +61,6 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
     private Connected connected = Connected.False;
     private boolean initialStart = true;
     private boolean hexEnabled = false;
-    private String newline = TextUtil.newline_crlf;
     private static final String start = "A0 01 01 A2";
     private static final String stop = "A0 01 00 A1";
 
@@ -175,8 +174,8 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
         Start.setOnClickListener(v -> send(start));
         Stop.setOnClickListener(v -> send(stop));
 
-        startShort.setOnClickListener(v -> startSoundDuration(500));
-        startLong.setOnClickListener(v -> startSoundDuration(1500));
+        startShort.setOnClickListener(v -> startSoundDuration(1000));
+        startLong.setOnClickListener(v -> startSoundDuration(2000));
         return view;
     }
 
@@ -245,6 +244,7 @@ public class TimerFragment extends Fragment implements ServiceConnection, Serial
             byte[] data;
             StringBuilder sb = new StringBuilder();
             TextUtil.toHexString(sb, TextUtil.fromHexString(str));
+            String newline = TextUtil.newline_crlf;
             TextUtil.toHexString(sb, newline.getBytes());
             msg = sb.toString();
             data = TextUtil.fromHexString(msg);
